@@ -1,0 +1,55 @@
+import pytest
+from playwright.sync_api import sync_playwright
+
+@pytest.fixture(scope="session")
+def browser_context():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context()
+        yield context
+        context.close()
+        browser.close()
+
+@pytest.fixture(scope="function")
+def page(browser_context):
+    page = browser_context.new_page()
+    page.goto("https://koshelek.ru")
+    page.click("text=Регистрация")  # Подумайте о замене на подходящий селектор
+    yield page
+
+def test_empty_fields(page):
+    page.click("button[type=submit]")
+    assert page.locator("text=Поле обязательно для заполнения").count() > 0
+
+def test_invalid_email(page):
+    page.fill("input[name=email]", "invalid-email")
+    page.click("button[type=submit]")
+    assert page.locator("text=Введите корректный адрес электронной почты").count() > 0
+
+def test_short_password(page):
+    page.fill("input[name=password]", "123")
+    page.click("button[type=submit]")
+    assert page.locator("text=Пароль должен содержать не менее 8 символов").count() > 0
+
+def test_mismatched_passwords(page):
+    page.fill("input[name=password]", "correctpassword")
+    page.fill("input[name=confirm_password]", "wrongpassword")
+    page.click("button[type=submit]")
+    assert page.locator("text=Пароли не совпадают").count() > 0
+
+def test_existing_email(page):
+    page.fill("input[name=email]", "existing@example.com")
+    page.fill("input[name=password]", "correctpassword")
+    page.fill("input[name=confirm_password]", "correctpassword")
+    page.click("button[type=submit]")
+    assert page.locator("text=Электронная почта уже зарегистрирована").count() > 0
+
+def test_invalid_phone_number(page):
+    page.fill("input[name=phone]", "12345")
+    page.click("button[type=submit]")
+    assert page.locator("text=Введите корректный номер телефона").count() > 0
+
+def test_empty_name(page):
+    page.fill("input[name=name]", "")
+    page.click("button[type=submit]")
+    assert page.locator("text=Поле обязательно для заполнения").count() > 0
